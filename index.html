@@ -1,0 +1,1074 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>给策划烧纸 · 清明礼花烧纸模拟器</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html,body { width:100%; height:100%; overflow:hidden; background:#0b1026;
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+  canvas#game { position:fixed; inset:0; display:block; cursor:pointer; }
+  #vignette { position:fixed; inset:0; pointer-events:none; z-index:4;
+    background:radial-gradient(ellipse at 50% 55%, transparent 52%, rgba(0,0,12,.5) 100%); }
+
+  #hud-top { position:fixed; top:12px; left:12px; right:12px; display:flex; justify-content:space-between;
+    align-items:flex-start; gap:10px; z-index:6; pointer-events:none; flex-wrap:wrap; }
+  .title-box { pointer-events:auto; background:rgba(10,14,30,.6); border:1px solid rgba(255,214,102,.35);
+    border-radius:12px; padding:10px 16px; backdrop-filter:blur(6px); box-shadow:0 4px 24px rgba(0,0,0,.45); }
+  h1 { font-family:"STKaiti","KaiTi","Microsoft YaHei",serif; font-size:26px; letter-spacing:2px;
+    color:#ffd166; text-shadow:0 0 14px rgba(255,180,60,.65), 0 2px 0 #000; }
+  h1 small { font-size:11px; color:#8f86b8; letter-spacing:0; margin-left:8px; }
+  .sub { font-size:11px; color:#cbbf9a; margin-top:2px; }
+  .stats { margin-top:8px; display:flex; gap:16px; font-size:12px; color:#e8e0c8; flex-wrap:wrap; }
+  .stats b { color:#ffd166; }
+  .stats .neg { color:#ff6b6b; }
+  .btns { display:flex; gap:8px; flex-wrap:wrap; pointer-events:auto; justify-content:flex-end; }
+  button { font-family:inherit; font-size:12px; color:#ffe9b0; cursor:pointer;
+    background:linear-gradient(180deg,#3a2f55,#241d3a); border:1px solid #8a6d3b; border-radius:8px;
+    padding:7px 11px; box-shadow:0 2px 8px rgba(0,0,0,.45); transition:transform .08s, filter .15s; }
+  button:hover { filter:brightness(1.25); transform:translateY(-1px); }
+  button:active { transform:translateY(1px); }
+  button.on { background:linear-gradient(180deg,#6b4a1f,#4a3013); border-color:#ffd166; color:#ffe9b0; }
+
+  #announce { position:fixed; top:20%; left:50%; transform:translateX(-50%); z-index:8; pointer-events:none;
+    font-size:30px; font-weight:700; letter-spacing:3px; white-space:nowrap; opacity:0;
+    max-width:94vw; overflow:hidden; text-overflow:ellipsis;
+    text-shadow:0 0 18px rgba(255,200,80,.9), 0 0 46px rgba(255,150,0,.55), 0 2px 0 #000; }
+  @media (max-width:720px) { #announce { font-size:21px; letter-spacing:1px; } }
+  #announce.show { animation:annPop 2.3s ease forwards; }
+  @keyframes annPop { 0%{opacity:0; transform:translateX(-50%) scale(.55);}
+    12%{opacity:1; transform:translateX(-50%) scale(1.1);} 22%{transform:translateX(-50%) scale(1);}
+    78%{opacity:1;} 100%{opacity:0; transform:translateX(-50%) translateY(-20px) scale(1);} }
+
+  .dp { position:fixed; z-index:7; pointer-events:none; white-space:nowrap;
+    background:linear-gradient(180deg,rgba(20,16,40,.93),rgba(12,10,26,.93));
+    border:1px solid var(--c); border-radius:10px; padding:7px 13px; font-size:13px; color:var(--c);
+    box-shadow:0 0 18px var(--c), 0 6px 20px rgba(0,0,0,.5); animation:dpFloat 1.8s ease forwards; }
+  .dp .dpn { font-weight:700; }
+  .dp .dpr { font-size:10px; opacity:.85; margin-top:1px; }
+  @keyframes dpFloat { 0%{opacity:0; transform:translate(-50%,0) scale(.7);}
+    14%{opacity:1; transform:translate(-50%,-14px) scale(1.06);} 30%{transform:translate(-50%,-22px) scale(1);}
+    100%{opacity:0; transform:translate(-50%,-120px) scale(.95);} }
+
+  .flt { position:fixed; z-index:7; pointer-events:none; font-size:13px; font-weight:700; color:#ffe9b0;
+    text-shadow:0 0 8px rgba(255,180,60,.8), 0 1px 0 #000; white-space:nowrap; animation:fltUp 2.2s ease forwards; }
+  @keyframes fltUp { 0%{opacity:0; transform:translate(-50%,0);} 12%{opacity:1;}
+    100%{opacity:0; transform:translate(-50%,-95px);} }
+
+  #combo { position:fixed; left:50%; z-index:6; pointer-events:none; transform:translateX(-50%);
+    font-size:20px; font-weight:700; color:#ff9f1c; text-shadow:0 0 12px rgba(255,120,0,.85), 0 2px 0 #000;
+    display:none; animation:comboPulse .5s ease infinite alternate; }
+  @keyframes comboPulse { from{transform:translateX(-50%) scale(1);} to{transform:translateX(-50%) scale(1.08);} }
+
+  #log { position:fixed; left:12px; bottom:12px; width:290px; max-height:32vh; overflow:hidden; z-index:5;
+    display:flex; flex-direction:column-reverse; gap:3px; pointer-events:none; }
+  .lg { font-size:11px; color:#cfc6a8; background:rgba(8,10,22,.55); border-left:3px solid var(--c);
+    padding:3px 8px; border-radius:0 6px 6px 0; animation:lgIn .3s ease; }
+  .lg .tm { opacity:.55; margin-right:6px; font-size:10px; }
+  @keyframes lgIn { from{opacity:0; transform:translateX(-12px);} }
+
+  #hint { position:fixed; bottom:12px; right:12px; z-index:5; text-align:right; pointer-events:none;
+    font-size:11px; line-height:1.8; color:rgba(230,220,190,.5); }
+
+  .modal { position:fixed; inset:0; background:rgba(5,6,15,.74); z-index:20; display:flex;
+    align-items:center; justify-content:center; padding:16px; }
+  .modal.hidden { display:none; }
+  #modalCard { width:min(680px,94vw); max-height:80vh; overflow:auto; padding:20px 24px;
+    background:linear-gradient(180deg,#2a2318,#19140d); border:2px solid #c9a24a; border-radius:14px;
+    box-shadow:0 0 60px rgba(255,190,80,.25); color:#f0e2bc; }
+  #modalCard h2 { color:#ffd166; margin-bottom:4px; font-size:18px; }
+  #modalCard .mssProg { font-size:12px; color:#cbbf9a; margin-bottom:14px; }
+  .mss { background:rgba(255,240,200,.06); border:1px solid rgba(201,162,74,.5); border-radius:8px;
+    padding:10px 12px; margin-bottom:10px; }
+  .mss .mt { font-weight:700; color:#ffe9a8; font-size:14px; margin-bottom:4px; }
+  .mss .md { font-size:12.5px; line-height:1.75; color:#d9cba4; white-space:pre-line; }
+  .mss.locked { opacity:.42; }
+  .mss.locked .mt { color:#9a9178; }
+  #modalClose { margin-top:14px; width:100%; padding:9px; font-size:13px; }
+
+  #payModal { position:fixed; inset:0; background:rgba(5,6,15,.74); z-index:22; display:flex;
+    align-items:center; justify-content:center; padding:16px; }
+  #payModal.hidden { display:none; }
+  #payCard { width:min(380px,92vw); background:linear-gradient(180deg,#33291a,#1c150c);
+    border:2px solid #e8b64c; border-radius:14px; padding:20px; text-align:center;
+    box-shadow:0 0 50px rgba(255,200,80,.35); color:#f0e2bc; }
+  #payCard.shake { animation:shake .4s ease; }
+  @keyframes shake { 0%,100%{transform:translateX(0);} 20%{transform:translateX(-9px);} 40%{transform:translateX(9px);}
+    60%{transform:translateX(-6px);} 80%{transform:translateX(6px);} }
+  #payTitle { color:#ffd166; font-size:16px; font-weight:700; margin-bottom:10px; }
+  #payText { font-size:13px; line-height:1.8; margin-bottom:16px; }
+  #payText b { color:#ffd166; }
+  #payBtns { display:flex; gap:10px; justify-content:center; }
+  #payBtns button { padding:9px 14px; font-size:13px; }
+  #payBtns #payYes { background:linear-gradient(180deg,#8a5a1e,#5f3c10); border-color:#ffd166; color:#ffe9b0; }
+</style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="vignette"></div>
+
+<div id="hud-top">
+  <div class="title-box">
+    <h1>给策划烧纸 <small>v2.0.4-内测-公测-返利-重制版</small></h1>
+    <div class="sub">清明限定 · 烧纸掉宝模拟器 · 上线即送 648（假的）</div>
+    <div class="stats">
+      <span>烧纸 <b id="statBurns">0</b> 次</span>
+      <span>功德值 <b id="statMerit">0</b></span>
+      <span>手稿 <b id="statMss">0</b>/13</span>
+    </div>
+  </div>
+  <div class="btns">
+    <button id="btnMusic" class="on">♪ 音乐：开</button>
+    <button id="btnSfx" class="on">🔊 音效：开</button>
+    <button id="btnAuto">⏳ 自动烧纸：关</button>
+    <button id="btnLib">📜 手稿阅览室 (0)</button>
+    <button id="btnPay">💎 充值提醒</button>
+  </div>
+</div>
+
+<div id="announce"></div>
+<div id="combo"></div>
+
+<div id="log"></div>
+<div id="hint">点击 / 空格 烧纸 · 长按连烧 · 连烧出大礼花<br>掉落全靠缘分（公示概率 0.0001%，字太小看不清）</div>
+
+<div id="modal" class="modal hidden">
+  <div id="modalCard">
+    <h2>📜 反人类氪金玩法设计手稿 · 阅览室</h2>
+    <div class="mssProg" id="mssProg"></div>
+    <div id="mssList"></div>
+    <button id="modalClose">收 起</button>
+  </div>
+</div>
+
+<div id="payModal" class="modal hidden">
+  <div id="payCard">
+    <div id="payTitle">💎 策划温馨提示</div>
+    <div id="payText">检测到您已有 <b>0.0001</b> 秒未充值。<br>是否立即充值 <b>648</b> 元？（限时 1 秒）</div>
+    <div id="payBtns">
+      <button id="payYes">✅ 立即充值</button>
+      <button id="payNo">😭 残忍拒绝</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+'use strict';
+
+/* ================= 工具 ================= */
+const rand = (a, b) => a + Math.random() * (b - a);
+const randi = (a, b) => Math.floor(rand(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => v < a ? a : (v > b ? b : v);
+const TAU = Math.PI * 2;
+
+/* ================= 画布 ================= */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+const bg = document.createElement('canvas');
+const bctx = bg.getContext('2d');
+let W = 0, H = 0, DPR = 1, groundY = 0, cx = 0, potTopY = 0;
+
+function resize() {
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * DPR; canvas.height = H * DPR;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  bg.width = W * DPR; bg.height = H * DPR;
+  bctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  groundY = H * 0.8; cx = W * 0.5; potTopY = groundY - 58;
+  buildBackground();
+}
+
+/* ---------- 静态背景 ---------- */
+let stars = [], twinkles = [];
+
+function ridgePoints(amp, base, n, seed) {
+  const pts = []; let s = seed;
+  const rnd = () => { s = (s * 9301 + 49297) % 233280; return s / 233280; };
+  for (let i = 0; i <= n; i++) pts.push([i / n * W, base - rnd() * amp]);
+  return pts;
+}
+
+function drawRidge(pts, color) {
+  bctx.fillStyle = color;
+  bctx.beginPath();
+  bctx.moveTo(-10, H);
+  for (const p of pts) bctx.lineTo(p[0], p[1]);
+  bctx.lineTo(W + 10, H);
+  bctx.closePath();
+  bctx.fill();
+}
+
+function drawPot(x, y) {
+  bctx.fillStyle = '#241c12';
+  bctx.fillRect(x - 48, y - 6, 9, 14); bctx.fillRect(x + 39, y - 6, 9, 14);
+  bctx.beginPath();
+  bctx.moveTo(x - 74, y - 52); bctx.lineTo(x + 74, y - 52);
+  bctx.lineTo(x + 52, y); bctx.lineTo(x - 52, y);
+  bctx.closePath();
+  const g = bctx.createLinearGradient(x - 74, y - 52, x + 74, y);
+  g.addColorStop(0, '#4a3826'); g.addColorStop(.5, '#6b5233'); g.addColorStop(1, '#38291b');
+  bctx.fillStyle = g; bctx.fill();
+  bctx.strokeStyle = '#241a10'; bctx.lineWidth = 3; bctx.stroke();
+  bctx.fillStyle = '#7a5c37';
+  bctx.beginPath(); bctx.ellipse(x, y - 52, 80, 16, 0, 0, TAU); bctx.fill();
+  bctx.strokeStyle = '#4a3826'; bctx.lineWidth = 2.5; bctx.stroke();
+  bctx.fillStyle = '#140d08';
+  bctx.beginPath(); bctx.ellipse(x, y - 52, 64, 10.5, 0, 0, TAU); bctx.fill();
+  bctx.strokeStyle = '#8a6b3f'; bctx.lineWidth = 2;
+  bctx.beginPath(); bctx.moveTo(x - 60, y - 24); bctx.lineTo(x + 60, y - 24); bctx.stroke();
+  bctx.strokeStyle = '#8a6b3f'; bctx.lineWidth = 1.5;
+  bctx.beginPath(); bctx.moveTo(x - 40, y - 10); bctx.lineTo(x + 40, y - 10); bctx.stroke();
+}
+
+function buildBackground() {
+  const sky = bctx.createLinearGradient(0, 0, 0, H);
+  sky.addColorStop(0, '#0d1030');
+  sky.addColorStop(.45, '#2a2350');
+  sky.addColorStop(.72, '#7a3f63');
+  sky.addColorStop(.88, '#c96a4e');
+  sky.addColorStop(1, '#2a1a2e');
+  bctx.fillStyle = sky; bctx.fillRect(0, 0, W, H);
+
+  stars = [];
+  const nStars = Math.floor(W * H / 9000);
+  for (let i = 0; i < nStars; i++) stars.push({ x: rand(0, W), y: rand(0, H * 0.55), r: rand(.5, 1.7) });
+  twinkles = [];
+  for (let i = 0; i < 8; i++) twinkles.push({ x: rand(0, W), y: rand(0, H * 0.5), r: rand(1.2, 2.4), ph: rand(0, TAU) });
+
+  bctx.fillStyle = '#ffffff';
+  for (const s of stars) { bctx.globalAlpha = rand(.25, .8); bctx.beginPath(); bctx.arc(s.x, s.y, s.r, 0, TAU); bctx.fill(); }
+  bctx.globalAlpha = 1;
+
+  /* 月亮 */
+  const mx = W * 0.82, my = H * 0.14, mr = 34;
+  const mg = bctx.createRadialGradient(mx, my, mr * .2, mx, my, mr * 3);
+  mg.addColorStop(0, 'rgba(255,240,200,.5)'); mg.addColorStop(1, 'rgba(255,240,200,0)');
+  bctx.fillStyle = mg;
+  bctx.beginPath(); bctx.arc(mx, my, mr * 3, 0, TAU); bctx.fill();
+  bctx.fillStyle = '#fff3d6';
+  bctx.beginPath(); bctx.arc(mx, my, mr, 0, TAU); bctx.fill();
+  bctx.fillStyle = '#f0dcb8';
+  bctx.beginPath(); bctx.arc(mx - 12, my - 6, 7, 0, TAU); bctx.fill();
+  bctx.beginPath(); bctx.arc(mx + 10, my + 9, 5, 0, TAU); bctx.fill();
+
+  /* 远山 */
+  drawRidge(ridgePoints(H * 0.10, groundY - 46, 14, 7), '#3a3358');
+  drawRidge(ridgePoints(H * 0.08, groundY - 12, 12, 21), '#2c2745');
+  drawRidge(ridgePoints(H * 0.055, groundY + 10, 10, 33), '#221d38');
+
+  /* 地面 */
+  const gd = bctx.createLinearGradient(0, groundY - 14, 0, H);
+  gd.addColorStop(0, '#1a1c10'); gd.addColorStop(1, '#0a0c07');
+  bctx.fillStyle = gd; bctx.fillRect(0, groundY - 14, W, H - groundY + 14);
+  bctx.fillStyle = 'rgba(255,220,150,.05)';
+  for (let i = 0; i < 40; i++) bctx.fillRect(rand(0, W), rand(groundY, H), rand(30, 90), 1.5);
+
+  /* 供桌 + 蜡烛（简单剪影） */
+  bctx.fillStyle = '#241a12';
+  bctx.fillRect(cx - 150, groundY - 6, 300, 8);
+  bctx.fillRect(cx - 150, groundY - 18, 8, 18); bctx.fillRect(cx + 142, groundY - 18, 8, 18);
+  /* 蜡烛 */
+  for (const lx of [cx - 118, cx + 118]) {
+    bctx.fillStyle = '#d8cfa8';
+    bctx.fillRect(lx - 5, groundY - 40, 10, 34);
+    bctx.fillStyle = '#8a7a5a';
+    bctx.fillRect(lx - 2, groundY - 44, 4, 6);
+  }
+
+  /* 火盆 */
+  drawPot(cx, groundY);
+
+  bctx.fillStyle = 'rgba(255,150,60,.14)';
+  bctx.beginPath(); bctx.ellipse(cx, groundY + 8, 110, 16, 0, 0, TAU); bctx.fill();
+}
+
+/* ================= 状态 ================= */
+let t = 0;
+let particles = [];
+let papers = [];
+let rockets = [];
+let flash = 0;
+let combo = 0, comboTimer = 0;
+let burnCount = 0, merit = 0;
+let autoBurn = false, autoTimer = null, holdTimer = null;
+let autoToastCount = 0;
+
+/* ================= 掉落表 ================= */
+const RARITIES = {
+  common:     { label: '普通',     color: '#cdcdcd' },
+  rare:       { label: '稀有',     color: '#5fd35f' },
+  epic:       { label: '史诗',     color: '#4aa3ff' },
+  legendary:  { label: '传说',     color: '#c04dff' },
+  myth:       { label: '氪金至尊', color: '#ffb800' },
+  manuscript: { label: '策划手稿', color: '#ffe9a8' },
+};
+
+const LOOT = {
+  common: { weight: 40, items: [
+    { name: '安慰奖', desc: '系统鼓励您继续烧纸，下次一定。' },
+    { name: '1 金币', desc: '到账需缴纳 99% 手续费，实收 0.01。' },
+    { name: '无门槛优惠券', desc: '满 10000 减 5，仅限指定不可用商品。' },
+    { name: '幸运符', desc: '使用后下次保底必出【安慰奖】。' },
+    { name: '体力药水', desc: '服用后体力 -10，眩晕 3 秒。' },
+    { name: '大喇叭', desc: '喊话全服："我很非，勿念。"' },
+    { name: '经验值 +1', desc: '升到 2 级需要 100000000 经验。' },
+    { name: '蚊子腿', desc: '集齐 9999 根可兑换"蚊子腿碎片"。' },
+  ]},
+  rare: { weight: 26, items: [
+    { name: '首充双倍券', desc: '充值 648 元，到账 0.0001 元，双倍后 0.0002。' },
+    { name: '十连抽券', desc: '十连必出 9 个碎片 + 1 个保底碎片。' },
+    { name: '保底计数器', desc: '使用后保底进度归零，重新开始。' },
+    { name: '复活币', desc: '仅限 VIP18 及以上使用。' },
+    { name: '改名卡', desc: '改完后系统自动更名为"韭菜"。' },
+    { name: '加速券', desc: '加速后加载变得更慢。' },
+  ]},
+  epic: { weight: 15, items: [
+    { name: '限定皮肤·7天', desc: '有效期 7 天，其中 6 天服务器维护。' },
+    { name: '自动扣款月卡', desc: '每月自动扣款，取消按钮在第 18 层菜单。' },
+    { name: '概率 UP 券', desc: 'UP 后概率从 0.01% 提升至 0.02%。' },
+    { name: '离线收益', desc: '离线收益需在线连续领取 72 小时。' },
+    { name: '保底必出券', desc: '仅对非限定池生效，而您的目标在限定池。' },
+    { name: '体力月卡', desc: '每日体力 +5，体力上限 -5。' },
+  ]},
+  legendary: { weight: 9, items: [
+    { name: '传说武器', desc: '攻击力 +0.0001，强化材料需氪金购买。' },
+    { name: '全服喇叭', desc: '喊话后全服自动嘲讽您。' },
+    { name: '限定坐骑', desc: '跑得比策划画饼的速度稍慢一点点。' },
+    { name: '100 连抽券', desc: '100 连抽必出 99 个碎片。' },
+    { name: '策划亲笔签名', desc: '签名内容："感谢您为项目组贡献的年终奖。"' },
+  ]},
+  myth: { weight: 5, items: [
+    { name: '策划的良心', desc: '0.0001% 概率掉落。掉落即 BUG，已被紧急修复。' },
+    { name: '真·648', desc: '648 元游戏币，仅限抽卡，抽卡结果全保底。' },
+    { name: '内测资格', desc: '需先充值 10 万元解锁申请资格。' },
+    { name: '策划的眼泪', desc: '“为什么您还不充钱？”（流泪）' },
+  ]},
+  manuscript: { weight: 5, items: [
+    { name: '手稿·反向保底', text: '抽得越多，下次出货率越低。\n理由：防止玩家“毕业”后流失。' },
+    { name: '手稿·付费防沉迷', text: '连续在线 3 小时，需充值 98 元才能下线。\n理由：让玩家感受到“时间的价值”。' },
+    { name: '手稿·概率公示', text: '公示掉落概率：字号 0.5px，位于说明书第 18 页。\n理由：我们公示了，只是您没看见。' },
+    { name: '手稿·自动续费陷阱', text: '取消订阅按钮藏于第 18 层菜单，点击后弹窗“您确定要放弃这份优惠吗？”。\n随后自动续费。' },
+    { name: '手稿·弹窗艺术', text: '关闭按钮点击后自动下载全家桶。\n理由：教育玩家“耐心”。' },
+    { name: '手稿·VIP100级', text: 'VIP 共 100 级，每级需连续充值。\n满级后开放 VIP101（敬请期待）。' },
+    { name: '手稿·体力经济学', text: '体力上限 5 点，每点恢复需氪金。\n理由：控制玩家在线时长（指充值时长）。' },
+    { name: '手稿·新手礼包', text: '998 元“免费”新手礼包，内含 998 元优惠券（有效期 1 秒）。' },
+    { name: '手稿·合成奇迹', text: '100 个 SSR 可合成 1 个 SSSR。\nSSSR 可分解为 1 个 SSR。' },
+    { name: '手稿·排行榜', text: '榜上前 100 名均为机器人。\n理由：让玩家觉得“再充一点就能追上”。' },
+    { name: '手稿·年卡', text: '年卡有效期至 2123 年。\n激活码限今日有效。' },
+    { name: '手稿·充值确认', text: '充值时弹窗：“您确定要省下这笔钱吗？”\n默认选中“确定充值”。' },
+    { name: '手稿·防白嫖机制', text: '白嫖玩家将随机获得“蚊子腿”。\n蚊子腿可兑换“蚊子腿碎片”。' },
+  ]},
+};
+
+/* ================= 音频引擎 ================= */
+let AC = null, master = null, musicBus = null, sfxBus = null, noiseBuf = null;
+let musicOn = true, sfxOn = true;
+let musicTimer = null, nextNote = 0, step = 0;
+
+const NOTES = { C5: 523.25, D5: 587.33, E5: 659.25, G5: 783.99, A5: 880, C6: 1046.5, E6: 1318.51, B5: 987.77 };
+const MELODY = [
+  'E5','G5','A5','G5','E5','D5','C5','D5',
+  'E5','G5','A5','C6','A5','G5','E5','D5',
+  'E5','G5','A5','G5','E5','D5','C5','D5',
+  'E5','G5','A5','C6','C6','A5','G5','E5',
+].map(n => NOTES[n]);
+const BASS_ROOTS = [130.81, 98, 110, 87.31]; // C3 G2 A2 F2
+const BPM = 134, STEP = 60 / BPM / 2;
+
+function ensureAudio() {
+  if (AC) { if (AC.state === 'suspended') AC.resume().catch(() => {}); return; }
+  try {
+    AC = new (window.AudioContext || window.webkitAudioContext)();
+    master = AC.createGain(); master.gain.value = 0.8; master.connect(AC.destination);
+    musicBus = AC.createGain(); musicBus.gain.value = 0.55; musicBus.connect(master);
+    sfxBus = AC.createGain(); sfxBus.gain.value = 0.72; sfxBus.connect(master);
+    noiseBuf = AC.createBuffer(1, AC.sampleRate, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    startMusic();
+  } catch (e) { console.warn('audio unavailable', e); }
+}
+
+function tone(freq, t0, dur, opt) {
+  opt = opt || {};
+  const isMusic = opt.bus === 'music';
+  const bus = isMusic ? musicBus : sfxBus;
+  if (!AC || !bus) return;
+  if (isMusic ? !musicOn : !sfxOn) return;
+  const o = AC.createOscillator();
+  o.type = opt.type || 'triangle';
+  o.frequency.setValueAtTime(freq, t0);
+  if (opt.slideTo) o.frequency.exponentialRampToValueAtTime(opt.slideTo, t0 + dur);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(opt.vol || 0.15, t0 + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  let node = o;
+  if (opt.lp) { const f = AC.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = opt.lp; node.connect(f); node = f; }
+  node.connect(g); g.connect(bus);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+
+function noiseBurst(t0, dur, opt) {
+  opt = opt || {};
+  const isMusic = opt.bus === 'music';
+  const bus = isMusic ? musicBus : sfxBus;
+  if (!AC || !bus || !noiseBuf) return;
+  if (isMusic ? !musicOn : !sfxOn) return;
+  const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+  const f = AC.createBiquadFilter();
+  f.type = opt.type || 'bandpass';
+  f.frequency.setValueAtTime(opt.freq || 1000, t0);
+  f.Q.value = opt.q || 1;
+  if (opt.sweepTo) f.frequency.exponentialRampToValueAtTime(opt.sweepTo, t0 + dur);
+  const g = AC.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(opt.vol || 0.12, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f); f.connect(g); g.connect(bus);
+  src.start(t0); src.stop(t0 + dur + 0.05);
+}
+
+const sfx = {
+  whoosh() { if (!AC) return; const now = AC.currentTime; noiseBurst(now, 0.3, { type: 'bandpass', freq: 380, q: 2.5, vol: 0.12, sweepTo: 1600 }); },
+  crackle() { if (!AC) return; const now = AC.currentTime; for (let i = 0; i < 4; i++) noiseBurst(now + Math.random() * 0.18, 0.06, { type: 'highpass', freq: 2600, vol: 0.045 }); },
+  paper() { if (!AC) return; const now = AC.currentTime; noiseBurst(now, 0.08, { type: 'bandpass', freq: 2000, q: 4, vol: 0.05 }); },
+  boom(tier) { if (!AC) return; const now = AC.currentTime; const v = 0.14 + 0.05 * (tier || 1);
+    tone(110, now, 0.55, { type: 'sine', vol: v, slideTo: 38 });
+    noiseBurst(now, 0.38, { type: 'lowpass', freq: 900, q: 0.8, vol: v * 0.8, sweepTo: 120 }); },
+  ding() { if (!AC) return; const now = AC.currentTime; tone(987.77, now, 0.4, { type: 'sine', vol: 0.1 }); tone(1318.51, now + 0.06, 0.5, { type: 'sine', vol: 0.09 }); },
+  fanfare() { if (!AC) return; const now = AC.currentTime;
+    [659.25, 783.99, 987.77, 1318.51].forEach((f, i) => tone(f, now + i * 0.09, 0.5, { type: 'triangle', vol: 0.13 })); },
+};
+
+function startMusic() {
+  if (musicTimer) return;
+  step = 0; nextNote = AC.currentTime + 0.1;
+  musicTimer = setInterval(() => {
+    if (!AC) return;
+    while (nextNote < AC.currentTime + 0.14) {
+      scheduleStep(step, nextNote);
+      nextNote += STEP; step = (step + 1) % 32;
+    }
+  }, 25);
+}
+
+function scheduleStep(s, t0) {
+  const mel = MELODY[s];
+  if (mel) {
+    tone(mel, t0, 0.22, { type: 'triangle', vol: 0.13, bus: 'music' });
+    tone(mel, t0, 0.2, { type: 'sine', vol: 0.06, bus: 'music' });
+  }
+  if (s % 8 === 0) tone(NOTES.E6, t0, 0.5, { type: 'sine', vol: 0.045, bus: 'music' });
+  const bar = Math.floor(s / 8);
+  const root = BASS_ROOTS[bar];
+  const bs = s % 8;
+  if (bs === 0 || bs === 2) tone(root, t0, 0.2, { type: 'triangle', vol: 0.17, bus: 'music' });
+  else if (bs === 4 || bs === 6) tone(root * 2, t0, 0.18, { type: 'triangle', vol: 0.13, bus: 'music' });
+  if (s % 2 === 0) noiseBurst(t0, 0.05, { type: 'highpass', freq: 6000, vol: s % 4 === 0 ? 0.05 : 0.028, bus: 'music' });
+  if (s % 4 === 0) tone(140, t0, 0.13, { type: 'sine', vol: 0.3, slideTo: 45, bus: 'music' });
+  if (s % 8 === 2 || s % 8 === 6) noiseBurst(t0, 0.14, { type: 'bandpass', freq: 1500, q: 1.2, vol: 0.13, bus: 'music' });
+}
+
+/* ================= 粒子 ================= */
+const PALETTES = [
+  ['#ffd166', '#ef476f', '#ff9f1c'],
+  ['#06d6a0', '#118ab2', '#ffd166'],
+  ['#f72585', '#b5179e', '#7209b7'],
+  ['#4cc9f0', '#4361ee', '#f72585'],
+  ['#f9f871', '#ff9f1c', '#ff3c00'],
+  ['#90e0ef', '#00b4d8', '#ffb703'],
+];
+const HEART = [];
+for (let i = 0; i < 48; i++) {
+  const a = i / 48 * TAU;
+  HEART.push([Math.pow(Math.sin(a), 3), -(13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a)) / 16]);
+}
+
+function spawnFlame(x, y, s) {
+  particles.push({ kind: 'flame', x, y, vx: rand(-14, 14), vy: rand(-120, -60), grav: -20,
+    life: rand(0.4, 0.85), maxLife: 0.85, size: rand(6, 12) * s, seed: rand(0, TAU),
+    color: pick(['#ffb347', '#ff8c2e', '#ffd166', '#ff5e00']) });
+}
+function spawnSmoke(x, y) {
+  particles.push({ kind: 'smoke', x, y, vx: rand(-10, 10), vy: rand(-46, -24), grav: -14,
+    life: rand(1.2, 2.2), maxLife: 2.2, size: rand(8, 15) });
+}
+function spawnEmber(x, y, c) {
+  particles.push({ kind: 'ember', x, y, vx: rand(-34, 34), vy: rand(-120, -50), grav: 120,
+    life: rand(0.5, 1.3), maxLife: 1.3, size: rand(1.6, 3.2), color: c || pick(['#ff9a3c', '#ffd166', '#ff5e00']) });
+}
+
+function spawnSphere(x, y, tier, cols, n) {
+  const cnt = Math.round(n || 80 + tier * 35);
+  for (let i = 0; i < cnt; i++) {
+    const ang = Math.random() * TAU;
+    const sp = rand(130, 330) * (0.6 + tier * 0.15);
+    particles.push({ kind: Math.random() < 0.22 ? 'twinkle' : 'spark', x, y,
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, grav: 300,
+      life: rand(0.7, 1.5), maxLife: 1.5, size: rand(1.6, 3.4), color: pick(cols) });
+  }
+}
+
+function spawnRing(x, y, tier, cols, n) {
+  const cnt = Math.round(n || 56 + tier * 16);
+  for (let i = 0; i < cnt; i++) {
+    const ang = i / cnt * TAU;
+    const sp = rand(215, 265);
+    particles.push({ kind: 'spark', x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, grav: 300,
+      life: rand(0.8, 1.2), maxLife: 1.2, size: 2.4, color: pick(cols) });
+  }
+}
+
+function spawnPalm(x, y, tier, cols) {
+  const cnt = 22 + tier * 4;
+  for (let i = 0; i < cnt; i++) {
+    const ang = Math.random() * TAU;
+    const sp = rand(190, 330);
+    particles.push({ kind: 'palm', x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, grav: 130,
+      life: rand(0.9, 1.5), maxLife: 1.5, size: 2.6, color: pick(cols) });
+  }
+}
+
+function spawnCrackle(x, y, tier, cols) {
+  const cnt = 70 + tier * 25;
+  for (let i = 0; i < cnt; i++) {
+    const ang = Math.random() * TAU;
+    const sp = rand(120, 300) * (0.6 + tier * 0.15);
+    particles.push({ kind: Math.random() < 0.3 ? 'crackleSeed' : 'spark', x, y,
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, grav: 300,
+      life: rand(0.7, 1.4), maxLife: 1.4, size: rand(1.6, 3.2), color: pick(cols) });
+  }
+}
+
+function spawnHeart(x, y, tier, cols) {
+  const sp = 190 + tier * 40;
+  for (const pt of HEART) {
+    particles.push({ kind: 'spark', x: x + pt[0] * 6, y: y + pt[1] * 6,
+      vx: pt[0] * sp, vy: pt[1] * sp, grav: 45,
+      life: rand(1.2, 1.6), maxLife: 1.6, size: 2.6, color: pick(cols) });
+  }
+}
+
+function explode(x, y, tier, cols) {
+  sfx.boom(tier);
+  const c = cols || pick(PALETTES);
+  const type = tier >= 2 ? pick(['sphere', 'sphere', 'ring', 'palm', 'crackle', 'double', 'heart'])
+                         : pick(['sphere', 'sphere', 'ring', 'crackle', 'heart']);
+  if (type === 'double') { spawnSphere(x - 16, y, tier, c); spawnSphere(x + 16, y, tier, c); }
+  else if (type === 'ring') spawnRing(x, y, tier, c);
+  else if (type === 'palm') spawnPalm(x, y, tier, c);
+  else if (type === 'crackle') spawnCrackle(x, y, tier, c);
+  else if (type === 'heart') spawnHeart(x, y, tier, ['#ff8fab', '#ff4d6d', '#ffb3c6']);
+  else spawnSphere(x, y, tier, c);
+  if (tier >= 3) flash = 1;
+  else if (tier === 2) flash = 0.45;
+}
+
+/* ================= 火箭 ================= */
+function launchRocket(tier, heart) {
+  rockets.push({ x: cx + rand(-34, 34), y: groundY - 44,
+    vx: rand(-30, 30), vy: rand(-560, -400) - tier * 40,
+    tx: rand(W * 0.18, W * 0.82), ty: rand(H * 0.1, H * 0.45),
+    t: 0, life: 1.5, tier, heart: !!heart });
+  sfx.whoosh();
+}
+
+/* ================= 纸钱 ================= */
+function burn(x, y) {
+  ensureAudio();
+  const tx = cx + rand(-24, 24), ty = potTopY - 8;
+  const dur = rand(1.0, 1.35);
+  const G = 520;
+  const vy0 = (ty - y - 0.5 * G * dur * dur) / dur;
+  papers.push({ x, y, vx: (tx - x) / dur, vy: vy0, rot: rand(0, TAU), rotV: rand(-5, 5),
+    t: 0, state: 'fly', tx, ty, scale: 1, burnT: 0 });
+  sfx.paper();
+
+  combo++; comboTimer = 1.6;
+  burnCount++;
+  merit += 1;
+  const mroll = Math.random();
+  if (mroll < 0.12) { merit -= 666; floatText(cx, potTopY - 120, '功德 -666（被策划代为保管）', '#ff6b6b'); }
+  else if (mroll > 0.97) { merit += 88; floatText(cx, potTopY - 120, '功德 +88（纸钱有灵）', '#ffd166'); }
+  statBurns.textContent = burnCount;
+  statMerit.textContent = merit;
+  statMerit.classList.toggle('neg', merit < 0);
+  updateComboUI();
+  save();
+}
+
+function onPaperBurned() {
+  for (let i = 0; i < 8; i++) spawnEmber(potTopY - 30 + rand(-20, 20), potTopY - 30, null);
+  for (let i = 0; i < 12; i++) spawnFlame(potTopY - 34 + rand(-50, 50), potTopY - 34, rand(0.5, 0.9));
+  sfx.crackle();
+
+  const tier = combo >= 15 ? 3 : combo >= 8 ? 2 : combo >= 3 ? 1 : 0;
+  const chance = clamp(0.22 + combo * 0.05, 0.22, 0.9);
+  if (Math.random() < chance) launchRocket(Math.max(1, tier), false);
+  if (Math.random() < 0.05) launchRocket(2, true);
+  if (combo > 0 && combo % 10 === 0) floatText(cx, potTopY - 150, '连烧 x' + combo + '！策划开始害怕了', '#ffb800');
+  rollLoot();
+}
+
+/* ================= 掉落 ================= */
+let collection = { mss: {} };
+let mssOrder = [];
+const MSS_NAMES = LOOT.manuscript.items.map(it => it.name);
+
+function load() {
+  try {
+    const raw = localStorage.getItem('kaice-shaozhi-v1');
+    if (raw) {
+      const d = JSON.parse(raw);
+      burnCount = d.burns || 0; merit = d.merit || 0;
+      const names = d.mss || [];
+      mssOrder = names.filter(n => MSS_NAMES.includes(n));
+      collection.mss = {};
+      for (const n of mssOrder) {
+        const it = LOOT.manuscript.items.find(x => x.name === n);
+        if (it) collection.mss[n] = it;
+      }
+    }
+  } catch (e) { /* ignore */ }
+  mssOrder = mssOrder.length ? mssOrder : MSS_NAMES.filter(n => collection.mss[n]);
+  statBurns.textContent = burnCount;
+  statMerit.textContent = merit;
+  statMerit.classList.toggle('neg', merit < 0);
+  updateMssBadge();
+}
+
+function save() {
+  try {
+    localStorage.setItem('kaice-shaozhi-v1', JSON.stringify({ burns: burnCount, merit, mss: mssOrder }));
+  } catch (e) { /* ignore */ }
+}
+
+function rollLoot() {
+  const totalW = Object.values(LOOT).reduce((s, r) => s + r.weight, 0);
+  let roll = Math.random() * totalW;
+  let rarKey = 'common';
+  for (const k of Object.keys(LOOT)) { roll -= LOOT[k].weight; if (roll <= 0) { rarKey = k; break; } }
+  const rar = RARITIES[rarKey];
+  const item = pick(LOOT[rarKey].items);
+
+  if (rarKey === 'manuscript') {
+    if (!collection.mss[item.name]) {
+      collection.mss[item.name] = item;
+      mssOrder.push(item.name);
+      updateMssBadge();
+      save();
+      announce('📜 掉落策划手稿：' + item.name, rar.color);
+      floatText(cx, potTopY - 130, '快把手稿收进阅览室！', rar.color);
+      sfx.fanfare();
+      launchRocket(3, false);
+      setTimeout(() => explode(rand(W * 0.2, W * 0.8), rand(H * 0.15, H * 0.4), 2, ['#ffe9a8', '#ffd166', '#c9a24a']), 300);
+    } else {
+      floatText(cx, potTopY - 120, '重复手稿 ×1（可兑换 0 元宝）', '#cdcdcd');
+      sfx.ding();
+    }
+    return;
+  }
+
+  popDrop(item, rar);
+  addLog(item, rar);
+  if (rarKey === 'common' || rarKey === 'rare') sfx.ding();
+  if (rarKey === 'epic') { announce('★ 史诗：' + item.name, rar.color); sfx.ding(); launchRocket(1, false); }
+  if (rarKey === 'legendary') { announce('★ 传说掉落：' + item.name, rar.color); sfx.fanfare(); launchRocket(2, false); }
+  if (rarKey === 'myth') {
+    announce('★ 氪金至尊掉落：' + item.name + ' ★', rar.color);
+    sfx.fanfare();
+    launchRocket(3, false);
+    setTimeout(() => launchRocket(3, false), 240);
+    setTimeout(() => launchRocket(3, false), 480);
+    for (let i = 0; i < 30; i++) particles.push({ kind: 'ember', x: rand(0, W), y: rand(-40, 0),
+      vx: rand(-20, 20), vy: rand(60, 160), grav: 60, life: rand(1.5, 3), maxLife: 3,
+      size: rand(1.8, 3.6), color: pick(['#ffd700', '#ffe066', '#ffb800']) });
+  }
+}
+
+/* ================= UI ================= */
+const $ = id => document.getElementById(id);
+const statBurns = $('statBurns'), statMerit = $('statMerit'), statMss = $('statMss');
+const announceEl = $('announce'), comboEl = $('combo'), logEl = $('log');
+const modal = $('modal'), payModal = $('payModal'), mssList = $('mssList'), mssProg = $('mssProg');
+
+function announce(text, color) {
+  announceEl.textContent = text;
+  announceEl.style.color = color;
+  announceEl.classList.remove('show');
+  void announceEl.offsetWidth;
+  announceEl.classList.add('show');
+}
+
+function floatText(x, y, text, color) {
+  const el = document.createElement('div');
+  el.className = 'flt';
+  el.textContent = text;
+  el.style.color = color || '#ffe9b0';
+  el.style.left = x + 'px'; el.style.top = y + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2300);
+}
+
+function popDrop(item, rar) {
+  const el = document.createElement('div');
+  el.className = 'dp';
+  el.style.setProperty('--c', rar.color);
+  el.innerHTML = '<div class="dpn">' + item.name + '</div><div class="dpr">' + rar.label + '</div>';
+  el.style.left = clamp(cx + rand(-140, 140), 90, W - 90) + 'px';
+  el.style.top = clamp(potTopY - 46, 80, H - 60) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 1850);
+}
+
+function addLog(item, rar) {
+  const el = document.createElement('div');
+  el.className = 'lg';
+  el.style.setProperty('--c', rar.color);
+  const tm = new Date().toTimeString().slice(0, 8);
+  el.innerHTML = '<span class="tm">' + tm + '</span>[' + rar.label + '] ' + item.name;
+  logEl.appendChild(el);
+  while (logEl.children.length > 14) logEl.removeChild(logEl.firstChild);
+}
+
+function updateComboUI() {
+  if (combo >= 2) {
+    comboEl.style.display = 'block';
+    comboEl.textContent = '🔥 连烧 x' + combo;
+    comboEl.style.left = cx + 'px';
+    comboEl.style.top = (potTopY - 118) + 'px';
+  } else comboEl.style.display = 'none';
+}
+
+function updateMssBadge() {
+  const n = mssOrder.length;
+  statMss.textContent = n;
+  $('btnLib').textContent = '📜 手稿阅览室 (' + n + ')';
+}
+
+function openLib() {
+  mssList.innerHTML = '';
+  mssProg.textContent = '已收集 ' + mssOrder.length + ' / ' + MSS_NAMES.length + ' 份反人类手稿';
+  for (const name of MSS_NAMES) {
+    const it = LOOT.manuscript.items.find(x => x.name === name);
+    const got = !!collection.mss[name];
+    const div = document.createElement('div');
+    div.className = 'mss' + (got ? '' : ' locked');
+    div.innerHTML = '<div class="mt">' + (got ? it.name : '？？？（未获得）') + '</div>' +
+      '<div class="md">' + (got ? it.text : '烧纸有几率掉落，据说要心诚（充钱）。') + '</div>';
+    mssList.appendChild(div);
+  }
+  modal.classList.remove('hidden');
+}
+
+/* ================= 充值梗 ================= */
+let payNoClicks = 0;
+const PAY_TEXTS = [
+  '检测到您已有 <b>0.0001</b> 秒未充值。<br>是否立即充值 <b>648</b> 元？（限时 1 秒）',
+  '检测到您的钱包余额 > 0。<br>策划建议立即充值 <b>648</b> 元以防余额发霉。',
+  '检测到您关闭了充值弹窗。<br>系统已自动为您打开。（关不掉）',
+  '检测到您已白嫖 <b>3</b> 分钟。<br>氪金之王正在注视您。',
+];
+function openPay() {
+  payNoClicks = 0;
+  $('payText').innerHTML = pick(PAY_TEXTS);
+  $('payNo').textContent = '😭 残忍拒绝';
+  payModal.classList.remove('hidden');
+  ensureAudio();
+  sfx.ding();
+}
+
+/* ================= 更新 ================= */
+function update(dt) {
+  t += dt;
+  if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) { combo = 0; updateComboUI(); } }
+  if (flash > 0) flash = Math.max(0, flash - dt * 1.8);
+
+  /* 火盆常驻火焰 */
+  for (let i = 0; i < 4; i++) spawnFlame(cx + rand(-48, 48), potTopY - 30, rand(0.55, 1));
+  if (Math.random() < 0.4) spawnSmoke(cx + rand(-20, 20), potTopY - 34);
+  if (Math.random() < 0.5) spawnEmber(cx + rand(-46, 46), potTopY - 26, null);
+
+  /* 粒子 */
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt;
+    if (p.life <= 0) {
+      if (p.kind === 'crackleSeed') {
+        for (let k = 0; k < 4; k++) particles.push({ kind: 'twinkle', x: p.x, y: p.y,
+          vx: rand(-120, 120), vy: rand(-120, 120), grav: 260, life: 0.35, maxLife: 0.35,
+          size: 1.3, color: '#fff6d8' });
+      }
+      particles.splice(i, 1);
+      continue;
+    }
+    p.vy += p.grav * dt;
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    if (p.kind === 'flame') p.vx += Math.sin(t * 22 + p.seed) * 30 * dt;
+    if (p.y > H + 30 || p.x < -40 || p.x > W + 40) { particles.splice(i, 1); continue; }
+  }
+  if (particles.length > 2400) particles.splice(0, particles.length - 2400);
+
+  /* 纸钱 */
+  for (let i = papers.length - 1; i >= 0; i--) {
+    const p = papers[i];
+    p.t += dt;
+    if (p.state === 'fly') {
+      p.vy += 520 * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt;
+      p.rot += p.rotV * dt;
+      if (Math.hypot(p.x - p.tx, p.y - p.ty) < 26 || p.y > potTopY + 6) {
+        p.state = 'burn'; p.t = 0; p.x = p.tx; p.y = p.ty;
+        for (let k = 0; k < 10; k++) spawnFlame(p.x + rand(-10, 10), p.y + rand(-8, 2), rand(0.4, 0.7));
+        sfx.crackle();
+      }
+    } else {
+      p.rot += p.rotV * 4 * dt;
+      p.scale = Math.max(0, 1 - p.t / 0.55);
+      if (Math.random() < 0.5) spawnFlame(p.x + rand(-9, 9), p.y + rand(-7, 2), rand(0.35, 0.65));
+      if (p.t > 0.55) { papers.splice(i, 1); onPaperBurned(); }
+    }
+  }
+
+  /* 火箭 */
+  for (let i = rockets.length - 1; i >= 0; i--) {
+    const r = rockets[i];
+    r.t += dt;
+    r.x += r.vx * dt; r.y += r.vy * dt;
+    r.vx += Math.sin(t * 9 + i) * 6 * dt;
+    if (Math.random() < 0.7) particles.push({ kind: 'trail', x: r.x, y: r.y,
+      vx: rand(-12, 12), vy: rand(-12, 12), grav: 0, life: 0.35, maxLife: 0.35,
+      size: 2.2, color: '#ffe9a8' });
+    if (r.y <= r.ty || r.t > r.life) {
+      rockets.splice(i, 1);
+      explode(r.x, r.y, r.tier, r.heart ? ['#ff8fab', '#ff4d6d', '#ffb3c6'] : null);
+    }
+  }
+}
+
+/* ================= 绘制 ================= */
+function draw() {
+  ctx.drawImage(bg, 0, 0, W, H);
+
+  /* 闪烁星星 */
+  ctx.fillStyle = '#fff';
+  for (const s of twinkles) {
+    ctx.globalAlpha = 0.4 + 0.5 * Math.abs(Math.sin(t * 1.6 + s.ph));
+    ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  /* 蜡烛火焰 */
+  for (const lx of [cx - 118, cx + 118]) {
+    const fy = groundY - 46;
+    const fh = 10 + Math.sin(t * 9 + lx) * 3 + rand(-1, 1);
+    ctx.fillStyle = 'rgba(255,190,80,.85)';
+    ctx.beginPath(); ctx.arc(lx, fy - fh / 2, fh * 0.42, 0, TAU); ctx.fill();
+    ctx.fillStyle = 'rgba(255,240,180,.9)';
+    ctx.beginPath(); ctx.arc(lx, fy - fh / 2, fh * 0.2, 0, TAU); ctx.fill();
+  }
+
+  /* 火盆火光 */
+  const glowR = 95 + Math.sin(t * 7) * 7 + Math.random() * 9;
+  const gg = ctx.createRadialGradient(cx, potTopY - 24, 8, cx, potTopY - 24, glowR);
+  gg.addColorStop(0, 'rgba(255,160,60,.55)');
+  gg.addColorStop(0.5, 'rgba(255,110,30,.22)');
+  gg.addColorStop(1, 'rgba(255,110,30,0)');
+  ctx.globalCompositeOperation = 'lighter';
+  ctx.fillStyle = gg;
+  ctx.beginPath(); ctx.arc(cx, potTopY - 24, glowR, 0, TAU); ctx.fill();
+  ctx.globalCompositeOperation = 'source-over';
+
+  /* 粒子 */
+  for (const p of particles) {
+    const a = clamp(p.life / p.maxLife, 0, 1);
+    if (p.kind === 'smoke') {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = a * 0.22;
+      ctx.fillStyle = '#9a9278';
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (1.7 - a * 0.7), 0, TAU); ctx.fill();
+      continue;
+    }
+    ctx.globalCompositeOperation = 'lighter';
+    if (p.kind === 'flame') {
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.45 + a * 0.55), 0, TAU); ctx.fill();
+    } else if (p.kind === 'ember') {
+      ctx.globalAlpha = a;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * a, 0, TAU); ctx.fill();
+    } else if (p.kind === 'trail') {
+      ctx.globalAlpha = a * 0.65;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * a, 0, TAU); ctx.fill();
+    } else {
+      let al = a;
+      if (p.kind === 'twinkle') al = a * (0.35 + 0.65 * Math.abs(Math.sin(p.life * 14)));
+      ctx.globalAlpha = al;
+      ctx.fillStyle = p.color;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.size * (0.4 + 0.6 * a), 0, TAU); ctx.fill();
+      if (p.kind === 'palm') {
+        ctx.strokeStyle = p.color;
+        ctx.globalAlpha = al * 0.55;
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(p.x, p.y);
+        ctx.lineTo(p.x - p.vx * 0.045, p.y - p.vy * 0.045);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+  ctx.globalCompositeOperation = 'source-over';
+
+  /* 纸钱 */
+  for (const p of papers) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.scale(p.scale, p.scale);
+    const burning = p.state === 'burn';
+    ctx.fillStyle = burning ? '#ff9a3c' : '#f2e2ae';
+    ctx.fillRect(-17, -10, 34, 20);
+    ctx.strokeStyle = burning ? '#d96a1a' : '#d9a24a';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(-17, -10, 34, 20);
+    ctx.fillStyle = burning ? '#ffd9a0' : '#b33';
+    ctx.globalAlpha = burning ? 0.5 : 0.8;
+    ctx.fillRect(-8, -5, 7, 10);
+    ctx.fillStyle = burning ? '#ff9a3c' : '#f2e2ae';
+    ctx.globalAlpha = burning ? 0.6 : 1;
+    ctx.beginPath(); ctx.arc(8, 0, 3, 0, TAU); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.restore();
+  }
+
+  /* 全屏闪光 */
+  if (flash > 0) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.globalAlpha = flash * 0.22;
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, W, H);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  }
+}
+
+/* ================= 输入 ================= */
+function onPointer(e) {
+  const x = e.clientX, y = e.clientY;
+  burn(x, y);
+  clearInterval(holdTimer);
+  holdTimer = setInterval(() => burn(x + rand(-18, 18), y + rand(-18, 18)), 230);
+}
+function endHold() { clearInterval(holdTimer); holdTimer = null; }
+
+document.addEventListener('pointerdown', e => { if (e.target === canvas) onPointer(e); });
+document.addEventListener('pointerup', endHold);
+document.addEventListener('pointercancel', endHold);
+window.addEventListener('blur', endHold);
+window.addEventListener('resize', resize);
+
+document.addEventListener('keydown', e => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (modal.classList.contains('hidden') && payModal.classList.contains('hidden')) {
+      burn(cx + rand(-60, 60), potTopY - 180);
+    }
+  }
+  if (e.key === 'm' || e.key === 'M') setMusic(!musicOn);
+});
+
+/* ================= 按钮 ================= */
+function setMusic(on) {
+  musicOn = on;
+  $('btnMusic').textContent = on ? '♪ 音乐：开' : '♪ 音乐：关';
+  $('btnMusic').classList.toggle('on', on);
+  if (on) ensureAudio();
+}
+function setSfx(on) {
+  sfxOn = on;
+  $('btnSfx').textContent = on ? '🔊 音效：开' : '🔊 音效：关';
+  $('btnSfx').classList.toggle('on', on);
+}
+
+$('btnMusic').addEventListener('click', () => setMusic(!musicOn));
+$('btnSfx').addEventListener('click', () => setSfx(!sfxOn));
+
+$('btnAuto').addEventListener('click', () => {
+  autoBurn = !autoBurn;
+  $('btnAuto').textContent = autoBurn ? '⏳ 自动烧纸：开' : '⏳ 自动烧纸：关';
+  $('btnAuto').classList.toggle('on', autoBurn);
+  if (autoBurn) {
+    ensureAudio();
+    floatText(cx, potTopY - 150, '已开通自动烧纸（体验版，正式版 98 元/月）', '#ffd166');
+    autoToastCount = 0;
+    autoTimer = setInterval(() => {
+      burn(cx + rand(-70, 70), potTopY - 160);
+      autoToastCount++;
+      if (autoToastCount % 10 === 0) floatText(cx, potTopY - 120, pick(['策划在后台看着您', '自动烧纸服务将在充值后自动续费', '已为您挂机：纸钱 +1', '自动烧纸会员本月到期（还有 9999 个月）']), '#cbbf9a');
+    }, 650);
+  } else {
+    clearInterval(autoTimer); autoTimer = null;
+  }
+});
+
+$('btnLib').addEventListener('click', () => { ensureAudio(); openLib(); });
+$('modalClose').addEventListener('click', () => modal.classList.add('hidden'));
+
+$('btnPay').addEventListener('click', openPay);
+$('payYes').addEventListener('click', () => {
+  payModal.classList.add('hidden');
+  merit -= 648;
+  statMerit.textContent = merit;
+  statMerit.classList.toggle('neg', merit < 0);
+  floatText(cx, potTopY - 130, '感谢您为本游戏续命 0.1 秒！功德 -648', '#ffb800');
+  for (let i = 0; i < 24; i++) particles.push({ kind: 'ember', x: cx + rand(-90, 90), y: potTopY - 120,
+    vx: rand(-60, 60), vy: rand(-240, -120), grav: 260, life: rand(0.8, 1.6), maxLife: 1.6,
+    size: rand(1.8, 3.4), color: pick(['#ffd700', '#ffe066', '#ffb800']) });
+  sfx.fanfare();
+  save();
+});
+$('payNo').addEventListener('click', () => {
+  payNoClicks++;
+  const card = $('payCard');
+  card.classList.remove('shake'); void card.offsetWidth; card.classList.add('shake');
+  if (payNoClicks === 1) {
+    floatText(cx, potTopY - 120, '拒绝失败：余额还够再氪一单', '#ff6b6b');
+    $('payNo').textContent = '😭 我错了，我要充值';
+    sfx.crackle();
+  } else {
+    payModal.classList.add('hidden');
+    floatText(cx, potTopY - 120, '拒绝成功（策划已哭晕在厕所）', '#5fd35f');
+    merit += 1;
+    statMerit.textContent = merit;
+    sfx.ding();
+    save();
+  }
+});
+
+/* ================= 初始化 ================= */
+window.addEventListener('visibilitychange', () => {
+  if (musicBus) musicBus.gain.value = document.hidden ? 0 : 0.55;
+});
+
+resize();
+load();
+requestAnimationFrame(ts => { t = 0; let last = ts; (function frame(now) {
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+})(ts); });
+})();
+</script>
+</body>
+</html>
