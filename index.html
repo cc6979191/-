@@ -17,7 +17,8 @@
   #hud-top { position:fixed; top:12px; left:12px; right:12px; display:flex; justify-content:space-between;
     align-items:flex-start; gap:10px; z-index:6; pointer-events:none; flex-wrap:wrap; }
   .title-box { pointer-events:auto; background:rgba(10,14,30,.6); border:1px solid rgba(255,214,102,.35);
-    border-radius:12px; padding:10px 16px; backdrop-filter:blur(6px); box-shadow:0 4px 24px rgba(0,0,0,.45); }
+    border-radius:12px; padding:10px 16px; box-shadow:0 4px 24px rgba(0,0,0,.45); }
+  @media (hover:hover) and (pointer:fine) { .title-box { backdrop-filter:blur(6px); } }
   h1 { font-family:"STKaiti","KaiTi","Microsoft YaHei",serif; font-size:26px; letter-spacing:2px;
     color:#ffd166; text-shadow:0 0 14px rgba(255,180,60,.65), 0 2px 0 #000; }
   h1 small { font-size:11px; color:#8f86b8; letter-spacing:0; margin-left:8px; }
@@ -124,7 +125,7 @@
 
 <div id="hud-top">
   <div class="title-box">
-    <h1>给策划烧纸 <small>v2.0.6-本地BGM版</small></h1>
+    <h1>给策划烧纸 <small>v2.0.7-性能优化版</small></h1>
     <div class="sub">清明限定 · 烧纸掉宝模拟器 · 上线即送 648（假的）</div>
     <div class="stats">
       <span>烧纸 <b id="statBurns">0</b> 次</span>
@@ -324,6 +325,13 @@ let burnCount = 0, merit = 0;
 let autoBurn = false, autoTimer = null, holdTimer = null;
 let autoToastCount = 0;
 let localAudio = null, localBgmActive = false, localSongName = '', localURL = null;
+
+/* ---------- 性能自适应 ---------- */
+const IS_MOBILE = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) ||
+  (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+let QUAL = IS_MOBILE ? 0.6 : 1;  // 粒子数量系数（移动端减半）
+let PERF = 1;                    // 低配模式系数（跑不动时自动降级）
+let avgDt = 0.016, perfCheckT = 0;
 
 /* ================= 掉落表 ================= */
 const RARITIES = {
@@ -533,7 +541,8 @@ function spawnEmber(x, y, c) {
 }
 
 function spawnSphere(x, y, tier, cols, n) {
-  const cnt = Math.round(n || 80 + tier * 35);
+  const q = QUAL * PERF;
+  const cnt = Math.round((n || 80 + tier * 35) * q);
   for (let i = 0; i < cnt; i++) {
     const ang = Math.random() * TAU;
     const sp = rand(130, 330) * (0.6 + tier * 0.15);
@@ -544,7 +553,7 @@ function spawnSphere(x, y, tier, cols, n) {
 }
 
 function spawnRing(x, y, tier, cols, n) {
-  const cnt = Math.round(n || 56 + tier * 16);
+  const cnt = Math.round((n || 56 + tier * 16) * QUAL * PERF);
   for (let i = 0; i < cnt; i++) {
     const ang = i / cnt * TAU;
     const sp = rand(215, 265);
@@ -554,7 +563,7 @@ function spawnRing(x, y, tier, cols, n) {
 }
 
 function spawnPalm(x, y, tier, cols) {
-  const cnt = 22 + tier * 4;
+  const cnt = Math.round((22 + tier * 4) * QUAL * PERF);
   for (let i = 0; i < cnt; i++) {
     const ang = Math.random() * TAU;
     const sp = rand(190, 330);
@@ -564,7 +573,7 @@ function spawnPalm(x, y, tier, cols) {
 }
 
 function spawnCrackle(x, y, tier, cols) {
-  const cnt = 70 + tier * 25;
+  const cnt = Math.round((70 + tier * 25) * QUAL * PERF);
   for (let i = 0; i < cnt; i++) {
     const ang = Math.random() * TAU;
     const sp = rand(120, 300) * (0.6 + tier * 0.15);
@@ -631,8 +640,9 @@ function burn(x, y) {
 }
 
 function onPaperBurned() {
-  for (let i = 0; i < 8; i++) spawnEmber(potTopY - 30 + rand(-20, 20), potTopY - 30, null);
-  for (let i = 0; i < 12; i++) spawnFlame(potTopY - 34 + rand(-50, 50), potTopY - 34, rand(0.5, 0.9));
+  const q = QUAL * PERF;
+  for (let i = 0; i < Math.round(8 * q); i++) spawnEmber(potTopY - 30 + rand(-20, 20), potTopY - 30, null);
+  for (let i = 0; i < Math.round(12 * q); i++) spawnFlame(potTopY - 34 + rand(-50, 50), potTopY - 34, rand(0.5, 0.9));
   sfx.crackle();
 
   const tier = combo >= 15 ? 3 : combo >= 8 ? 2 : combo >= 3 ? 1 : 0;
@@ -672,11 +682,16 @@ function load() {
   updateBkBadge();
 }
 
+let saveStamp = 0;
 function save() {
+  const now = Date.now();
+  if (now - saveStamp < 4000) return; // 节流：每 4 秒最多写一次存档
+  saveStamp = now;
   try {
     localStorage.setItem('kaice-shaozhi-v1', JSON.stringify({ burns: burnCount, merit, mss: mssOrder, items: collection.items }));
   } catch (e) { /* ignore */ }
 }
+function saveNow() { saveStamp = 0; save(); }
 
 function rollLoot() {
   const totalW = Object.values(LOOT).reduce((s, r) => s + r.weight, 0);
@@ -717,7 +732,7 @@ function rollLoot() {
     launchRocket(3, false);
     setTimeout(() => launchRocket(3, false), 240);
     setTimeout(() => launchRocket(3, false), 480);
-    for (let i = 0; i < 30; i++) particles.push({ kind: 'ember', x: rand(0, W), y: rand(-40, 0),
+    for (let i = 0; i < Math.round(30 * QUAL * PERF); i++) particles.push({ kind: 'ember', x: rand(0, W), y: rand(-40, 0),
       vx: rand(-20, 20), vy: rand(60, 160), grav: 60, life: rand(1.5, 3), maxLife: 3,
       size: rand(1.8, 3.6), color: pick(['#ffd700', '#ffe066', '#ffb800']) });
   }
@@ -855,10 +870,11 @@ function update(dt) {
   if (comboTimer > 0) { comboTimer -= dt; if (comboTimer <= 0) { combo = 0; updateComboUI(); } }
   if (flash > 0) flash = Math.max(0, flash - dt * 1.8);
 
-  /* 火盆常驻火焰 */
-  for (let i = 0; i < 4; i++) spawnFlame(cx + rand(-48, 48), potTopY - 30, rand(0.55, 1));
-  if (Math.random() < 0.4) spawnSmoke(cx + rand(-20, 20), potTopY - 34);
-  if (Math.random() < 0.5) spawnEmber(cx + rand(-46, 46), potTopY - 26, null);
+  /* 火盆常驻火焰（按性能缩放） */
+  const amb = Math.max(1, Math.round(4 * QUAL * PERF));
+  for (let i = 0; i < amb; i++) spawnFlame(cx + rand(-48, 48), potTopY - 30, rand(0.55, 1));
+  if (Math.random() < 0.4 * QUAL * PERF) spawnSmoke(cx + rand(-20, 20), potTopY - 34);
+  if (Math.random() < 0.5 * QUAL * PERF) spawnEmber(cx + rand(-46, 46), potTopY - 26, null);
 
   /* 粒子 */
   for (let i = particles.length - 1; i >= 0; i--) {
@@ -878,7 +894,8 @@ function update(dt) {
     if (p.kind === 'flame') p.vx += Math.sin(t * 22 + p.seed) * 30 * dt;
     if (p.y > H + 30 || p.x < -40 || p.x > W + 40) { particles.splice(i, 1); continue; }
   }
-  if (particles.length > 2400) particles.splice(0, particles.length - 2400);
+  const pcap = Math.round(2400 * QUAL * PERF);
+  if (particles.length > pcap) particles.splice(0, particles.length - pcap);
 
   /* 纸钱 */
   for (let i = papers.length - 1; i >= 0; i--) {
@@ -890,7 +907,7 @@ function update(dt) {
       p.rot += p.rotV * dt;
       if (Math.hypot(p.x - p.tx, p.y - p.ty) < 26 || p.y > potTopY + 6) {
         p.state = 'burn'; p.t = 0; p.x = p.tx; p.y = p.ty;
-        for (let k = 0; k < 10; k++) spawnFlame(p.x + rand(-10, 10), p.y + rand(-8, 2), rand(0.4, 0.7));
+        for (let k = 0; k < Math.round(10 * QUAL * PERF); k++) spawnFlame(p.x + rand(-10, 10), p.y + rand(-8, 2), rand(0.4, 0.7));
         sfx.crackle();
       }
     } else {
@@ -907,7 +924,7 @@ function update(dt) {
     r.t += dt;
     r.x += r.vx * dt; r.y += r.vy * dt;
     r.vx += Math.sin(t * 9 + i) * 6 * dt;
-    if (Math.random() < 0.7) particles.push({ kind: 'trail', x: r.x, y: r.y,
+    if (Math.random() < 0.7 * QUAL * PERF) particles.push({ kind: 'trail', x: r.x, y: r.y,
       vx: rand(-12, 12), vy: rand(-12, 12), grav: 0, life: 0.35, maxLife: 0.35,
       size: 2.2, color: '#ffe9a8' });
     if (r.y <= r.ty || r.t > r.life) {
@@ -1167,13 +1184,21 @@ $('payNo').addEventListener('click', () => {
 /* ================= 初始化 ================= */
 window.addEventListener('visibilitychange', () => {
   if (musicBus) musicBus.gain.value = document.hidden ? 0 : 0.55;
+  if (document.hidden) saveNow();
 });
+window.addEventListener('pagehide', saveNow);
 
 resize();
 load();
 requestAnimationFrame(ts => { t = 0; let last = ts; (function frame(now) {
   const dt = Math.min((now - last) / 1000, 0.05);
   last = now;
+  avgDt = avgDt * 0.97 + dt * 0.03;
+  perfCheckT += dt;
+  if (perfCheckT > 2 && PERF === 1 && avgDt > 0.042) {
+    PERF = 0.55;
+    floatText(W / 2, H * 0.62, '🔥 烧得太猛，已自动开启低配模式', '#ffb800');
+  }
   update(dt);
   draw();
   requestAnimationFrame(frame);
