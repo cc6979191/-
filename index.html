@@ -32,6 +32,7 @@
   button:hover { filter:brightness(1.25); transform:translateY(-1px); }
   button:active { transform:translateY(1px); }
   button.on { background:linear-gradient(180deg,#6b4a1f,#4a3013); border-color:#ffd166; color:#ffe9b0; }
+  #btnLocalX { border-color:#e0645c; color:#ffb3ae; }
 
   #announce { position:fixed; top:20%; left:50%; transform:translateX(-50%); z-index:8; pointer-events:none;
     font-size:30px; font-weight:700; letter-spacing:3px; white-space:nowrap; opacity:0;
@@ -123,7 +124,7 @@
 
 <div id="hud-top">
   <div class="title-box">
-    <h1>给策划烧纸 <small>v2.0.5-背包版</small></h1>
+    <h1>给策划烧纸 <small>v2.0.6-本地BGM版</small></h1>
     <div class="sub">清明限定 · 烧纸掉宝模拟器 · 上线即送 648（假的）</div>
     <div class="stats">
       <span>烧纸 <b id="statBurns">0</b> 次</span>
@@ -134,6 +135,8 @@
   <div class="btns">
     <button id="btnMusic" class="on">♪ 音乐：开</button>
     <button id="btnSfx" class="on">🔊 音效：开</button>
+    <button id="btnLocal">🎵 本地 BGM</button>
+    <button id="btnLocalX" style="display:none" title="停止本地歌曲，恢复内置音乐">✕ 停止</button>
     <button id="btnAuto">⏳ 自动烧纸：关</button>
     <button id="btnBk">🎒 背包 (0)</button>
     <button id="btnLib">📜 手稿阅览室 (0)</button>
@@ -143,9 +146,10 @@
 
 <div id="announce"></div>
 <div id="combo"></div>
+<input type="file" id="fileAudio" accept="audio/*" style="display:none">
 
 <div id="log"></div>
-<div id="hint">点击 / 空格 烧纸 · 长按连烧 · 连烧出大礼花<br>掉落全靠缘分（公示概率 0.0001%，字太小看不清）</div>
+<div id="hint">点击 / 空格 烧纸 · 长按连烧 · 连烧出大礼花<br>掉落全靠缘分（公示概率 0.0001%，字太小看不清）<br>🎵 点「本地 BGM」可换成自己手机里的歌</div>
 
 <div id="modal" class="modal hidden">
   <div id="modalCard">
@@ -319,6 +323,7 @@ let combo = 0, comboTimer = 0;
 let burnCount = 0, merit = 0;
 let autoBurn = false, autoTimer = null, holdTimer = null;
 let autoToastCount = 0;
+let localAudio = null, localBgmActive = false, localSongName = '', localURL = null;
 
 /* ================= 掉落表 ================= */
 const RARITIES = {
@@ -481,6 +486,7 @@ function startMusic() {
 }
 
 function scheduleStep(s, t0) {
+  if (localBgmActive) return; // 本地音乐宣战中：内置合成乐让位
   const mel = MELODY[s];
   if (mel) {
     tone(mel, t0, 0.22, { type: 'triangle', vol: 0.13, bus: 'music' });
@@ -1049,7 +1055,12 @@ function setMusic(on) {
   musicOn = on;
   $('btnMusic').textContent = on ? '♪ 音乐：开' : '♪ 音乐：关';
   $('btnMusic').classList.toggle('on', on);
-  if (on) ensureAudio();
+  if (on) {
+    if (localBgmActive) { if (localAudio) localAudio.play().catch(() => {}); }
+    else ensureAudio();
+  } else if (localBgmActive && localAudio) {
+    localAudio.pause();
+  }
 }
 function setSfx(on) {
   sfxOn = on;
@@ -1082,6 +1093,45 @@ $('btnLib').addEventListener('click', () => { ensureAudio(); openLib(); });
 $('modalClose').addEventListener('click', () => modal.classList.add('hidden'));
 $('btnBk').addEventListener('click', () => { ensureAudio(); openBk(); });
 $('bkClose').addEventListener('click', () => bkModal.classList.add('hidden'));
+
+/* ---------- 本地音乐 · 宣战 ---------- */
+localAudio = new Audio();
+localAudio.loop = true;
+localAudio.addEventListener('error', () => {
+  if (localSongName) floatText(cx, potTopY - 130, '该音频无法播放：格式可能不支持', '#ff6b6b');
+});
+$('btnLocal').addEventListener('click', () => { ensureAudio(); $('fileAudio').click(); });
+$('btnLocalX').addEventListener('click', stopLocalBgm);
+$('fileAudio').addEventListener('change', () => {
+  const f = $('fileAudio').files && $('fileAudio').files[0];
+  $('fileAudio').value = '';
+  if (!f) return;
+  ensureAudio();
+  if (localURL) URL.revokeObjectURL(localURL);
+  localURL = URL.createObjectURL(f);
+  localAudio.src = localURL;
+  localAudio.play().then(() => {
+    localBgmActive = true;
+    localSongName = f.name.replace(/\.[^.]+$/, '');
+    $('btnLocal').textContent = '🎵 ' + localSongName;
+    $('btnLocalX').style.display = '';
+    floatText(cx, potTopY - 130, '🎵 BGM 已换成《' + localSongName + '》· 宣战成功', '#7bd88f');
+    if (!musicOn) { musicOn = true; setMusic(true); }
+  }).catch(() => {
+    floatText(cx, potTopY - 130, '播放失败：格式不支持或需重新点击', '#ff6b6b');
+  });
+});
+
+function stopLocalBgm() {
+  if (localAudio) { localAudio.pause(); localAudio.src = ''; }
+  if (localURL) { URL.revokeObjectURL(localURL); localURL = null; }
+  localBgmActive = false;
+  localSongName = '';
+  $('btnLocal').textContent = '🎵 本地 BGM';
+  $('btnLocalX').style.display = 'none';
+  floatText(cx, potTopY - 130, '已恢复内置音乐', '#ffe9b0');
+  if (musicOn) ensureAudio();
+}
 
 $('btnPay').addEventListener('click', openPay);
 $('payYes').addEventListener('click', () => {
