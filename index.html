@@ -6,9 +6,10 @@
 <title>给策划烧纸 · 清明礼花烧纸模拟器</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔥</text></svg>">
 <style>
-  * { margin:0; padding:0; box-sizing:border-box; }
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { width:100%; height:100%; overflow:hidden; background:#0b1026;
-    font-family:"Microsoft YaHei","PingFang SC",sans-serif; user-select:none; -webkit-user-select:none; touch-action:manipulation; }
+    font-family:"Microsoft YaHei","PingFang SC",sans-serif; user-select:none; -webkit-user-select:none;
+    -webkit-touch-callout:none; touch-action:manipulation; }
   canvas#game { position:fixed; inset:0; display:block; cursor:pointer; }
   #vignette { position:fixed; inset:0; pointer-events:none; z-index:4;
     background:radial-gradient(ellipse at 50% 55%, transparent 52%, rgba(0,0,12,.5) 100%); }
@@ -75,10 +76,10 @@
   .modal { position:fixed; inset:0; background:rgba(5,6,15,.74); z-index:20; display:flex;
     align-items:center; justify-content:center; padding:16px; }
   .modal.hidden { display:none; }
-  #modalCard { width:min(680px,94vw); max-height:80vh; overflow:auto; padding:20px 24px;
+  #modalCard, #bkCard { width:min(680px,94vw); max-height:80vh; overflow:auto; padding:20px 24px;
     background:linear-gradient(180deg,#2a2318,#19140d); border:2px solid #c9a24a; border-radius:14px;
     box-shadow:0 0 60px rgba(255,190,80,.25); color:#f0e2bc; }
-  #modalCard h2 { color:#ffd166; margin-bottom:4px; font-size:18px; }
+  #modalCard h2, #bkCard h2 { color:#ffd166; margin-bottom:10px; font-size:18px; }
   #modalCard .mssProg { font-size:12px; color:#cbbf9a; margin-bottom:14px; }
   .mss { background:rgba(255,240,200,.06); border:1px solid rgba(201,162,74,.5); border-radius:8px;
     padding:10px 12px; margin-bottom:10px; }
@@ -86,6 +87,17 @@
   .mss .md { font-size:12.5px; line-height:1.75; color:#d9cba4; white-space:pre-line; }
   .mss.locked { opacity:.42; }
   .mss.locked .mt { color:#9a9178; }
+  #bkList .bkHead { font-size:12.5px; color:#cbbf9a; margin-bottom:12px; }
+  #bkList .bkHead b { color:#ffd166; }
+  .bkSec { font-size:12px; color:var(--c); font-weight:700; border-bottom:1px solid rgba(255,255,255,.08);
+    padding:10px 2px 6px; margin-top:6px; }
+  .bkItem { padding:6px 10px; border-left:3px solid var(--c); background:rgba(255,255,255,.03);
+    border-radius:0 6px 6px 0; margin-bottom:6px; }
+  .bkItem .bkName { font-size:13px; font-weight:700; color:#f0e2bc; }
+  .bkItem .bkCnt { color:var(--c); font-size:11px; margin-left:6px; }
+  .bkItem .bkDesc { font-size:11px; color:#9a9178; margin-top:2px; line-height:1.6; }
+  .bkItem.locked { border-left-color:#555; opacity:.5; }
+  .bkItem.locked .bkName { color:#8a8370; }
   #modalClose { margin-top:14px; width:100%; padding:9px; font-size:13px; }
 
   #payModal { position:fixed; inset:0; background:rgba(5,6,15,.74); z-index:22; display:flex;
@@ -111,7 +123,7 @@
 
 <div id="hud-top">
   <div class="title-box">
-    <h1>给策划烧纸 <small>v2.0.4-内测-公测-返利-重制版</small></h1>
+    <h1>给策划烧纸 <small>v2.0.5-背包版</small></h1>
     <div class="sub">清明限定 · 烧纸掉宝模拟器 · 上线即送 648（假的）</div>
     <div class="stats">
       <span>烧纸 <b id="statBurns">0</b> 次</span>
@@ -123,6 +135,7 @@
     <button id="btnMusic" class="on">♪ 音乐：开</button>
     <button id="btnSfx" class="on">🔊 音效：开</button>
     <button id="btnAuto">⏳ 自动烧纸：关</button>
+    <button id="btnBk">🎒 背包 (0)</button>
     <button id="btnLib">📜 手稿阅览室 (0)</button>
     <button id="btnPay">💎 充值提醒</button>
   </div>
@@ -140,6 +153,14 @@
     <div class="mssProg" id="mssProg"></div>
     <div id="mssList"></div>
     <button id="modalClose">收 起</button>
+  </div>
+</div>
+
+<div id="bkModal" class="modal hidden">
+  <div id="bkCard">
+    <h2>🎒 烧纸背包 · 掉落收藏</h2>
+    <div id="bkList"></div>
+    <button id="bkClose">收 起</button>
   </div>
 </div>
 
@@ -567,8 +588,7 @@ function explode(x, y, tier, cols) {
   else if (type === 'crackle') spawnCrackle(x, y, tier, c);
   else if (type === 'heart') spawnHeart(x, y, tier, ['#ff8fab', '#ff4d6d', '#ffb3c6']);
   else spawnSphere(x, y, tier, c);
-  if (tier >= 3) flash = 1;
-  else if (tier === 2) flash = 0.45;
+  if (tier >= 3) flash = 0.8;
 }
 
 /* ================= 火箭 ================= */
@@ -618,7 +638,7 @@ function onPaperBurned() {
 }
 
 /* ================= 掉落 ================= */
-let collection = { mss: {} };
+let collection = { items: {}, mss: {} };
 let mssOrder = [];
 const MSS_NAMES = LOOT.manuscript.items.map(it => it.name);
 
@@ -628,6 +648,7 @@ function load() {
     if (raw) {
       const d = JSON.parse(raw);
       burnCount = d.burns || 0; merit = d.merit || 0;
+      if (d.items) collection.items = d.items;
       const names = d.mss || [];
       mssOrder = names.filter(n => MSS_NAMES.includes(n));
       collection.mss = {};
@@ -642,11 +663,12 @@ function load() {
   statMerit.textContent = merit;
   statMerit.classList.toggle('neg', merit < 0);
   updateMssBadge();
+  updateBkBadge();
 }
 
 function save() {
   try {
-    localStorage.setItem('kaice-shaozhi-v1', JSON.stringify({ burns: burnCount, merit, mss: mssOrder }));
+    localStorage.setItem('kaice-shaozhi-v1', JSON.stringify({ burns: burnCount, merit, mss: mssOrder, items: collection.items }));
   } catch (e) { /* ignore */ }
 }
 
@@ -657,6 +679,8 @@ function rollLoot() {
   for (const k of Object.keys(LOOT)) { roll -= LOOT[k].weight; if (roll <= 0) { rarKey = k; break; } }
   const rar = RARITIES[rarKey];
   const item = pick(LOOT[rarKey].items);
+  collection.items[item.name] = (collection.items[item.name] || 0) + 1;
+  updateBkBadge();
 
   if (rarKey === 'manuscript') {
     if (!collection.mss[item.name]) {
@@ -698,6 +722,7 @@ const $ = id => document.getElementById(id);
 const statBurns = $('statBurns'), statMerit = $('statMerit'), statMss = $('statMss');
 const announceEl = $('announce'), comboEl = $('combo'), logEl = $('log');
 const modal = $('modal'), payModal = $('payModal'), mssList = $('mssList'), mssProg = $('mssProg');
+const bkModal = $('bkModal');
 
 function announce(text, color) {
   announceEl.textContent = text;
@@ -751,6 +776,39 @@ function updateMssBadge() {
   const n = mssOrder.length;
   statMss.textContent = n;
   $('btnLib').textContent = '📜 手稿阅览室 (' + n + ')';
+}
+
+function bkDistinct() { return Object.keys(collection.items).length; }
+function totalDrops() { let n = 0; for (const k in collection.items) n += collection.items[k]; return n; }
+const TOTAL_ITEM_TYPES = Object.values(LOOT).reduce((s, r) => s + r.items.length, 0);
+
+function updateBkBadge() {
+  $('btnBk').textContent = '🎒 背包 (' + bkDistinct() + ')';
+}
+
+function openBk() {
+  const list = $('bkList');
+  let html = '<div class="bkHead">共获得 <b>' + bkDistinct() + '</b> / ' + TOTAL_ITEM_TYPES +
+    ' 种 · 掉落累计 <b>' + totalDrops() + '</b> 件</div>';
+  const order = ['common', 'rare', 'epic', 'legendary', 'myth', 'manuscript'];
+  for (const key of order) {
+    const rar = RARITIES[key];
+    const items = LOOT[key].items;
+    const got = items.filter(it => collection.items[it.name]).length;
+    html += '<div class="bkSec" style="--c:' + rar.color + '">' + rar.label + '（' + got + '/' + items.length + '）</div>';
+    for (const it of items) {
+      const c = collection.items[it.name] || 0;
+      if (c > 0) {
+        html += '<div class="bkItem" style="--c:' + rar.color + '"><div class="bkName">' + it.name +
+          '<span class="bkCnt">×' + c + '</span></div><div class="bkDesc">' +
+          (it.text ? '📜 手稿类道具，点击顶部「手稿阅览室」查看全文' : it.desc) + '</div></div>';
+      } else {
+        html += '<div class="bkItem locked"><div class="bkName">？？？</div><div class="bkDesc">未获得 · 烧纸有几率掉落</div></div>';
+      }
+    }
+  }
+  list.innerHTML = html;
+  bkModal.classList.remove('hidden');
 }
 
 function openLib() {
@@ -979,7 +1037,7 @@ window.addEventListener('resize', resize);
 document.addEventListener('keydown', e => {
   if (e.code === 'Space') {
     e.preventDefault();
-    if (modal.classList.contains('hidden') && payModal.classList.contains('hidden')) {
+    if (modal.classList.contains('hidden') && payModal.classList.contains('hidden') && bkModal.classList.contains('hidden')) {
       burn(cx + rand(-60, 60), potTopY - 180);
     }
   }
@@ -1022,6 +1080,8 @@ $('btnAuto').addEventListener('click', () => {
 
 $('btnLib').addEventListener('click', () => { ensureAudio(); openLib(); });
 $('modalClose').addEventListener('click', () => modal.classList.add('hidden'));
+$('btnBk').addEventListener('click', () => { ensureAudio(); openBk(); });
+$('bkClose').addEventListener('click', () => bkModal.classList.add('hidden'));
 
 $('btnPay').addEventListener('click', openPay);
 $('payYes').addEventListener('click', () => {
